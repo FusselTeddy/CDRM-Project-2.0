@@ -1,3 +1,5 @@
+import base64
+
 from flask import Blueprint, jsonify, request, current_app, Response
 import os
 import yaml
@@ -6,7 +8,10 @@ from pyplayready.cdm import Cdm as PlayReadyCDM
 from pyplayready import PSSH as PlayReadyPSSH
 from pyplayready.exceptions import (InvalidSession, TooManySessions, InvalidLicense, InvalidPssh)
 from custom_functions.database.user_db import fetch_username_by_api_key
+from custom_functions.decrypt.api_decrypt import is_base64
 from custom_functions.user_checks.device_allowed import user_allowed_to_use_device
+from pathlib import Path
+
 
 
 
@@ -37,8 +42,23 @@ def remote_cdm_playready_deviceinfo():
         'security_level': cdm.security_level,
         'host': f'{config["fqdn"]}/remotecdm/playready',
         'secret': f'{config["remote_cdm_secret"]}',
-        'device_name': f'{base_name}'
+        'device_name': Path(base_name).stem
     })
+
+@remotecdm_pr_bp.route('/remotecdm/playready/deviceinfo/<device>', methods=['GET'])
+def remote_cdm_playready_deviceinfo_specific(device):
+    if request.method == 'GET':
+        base_name = Path(device).with_suffix('.prd').name
+        api_key = request.headers['X-Secret-Key']
+        username = fetch_username_by_api_key(api_key)
+        device = PlayReadyDevice.load(f'{os.getcwd()}/configs/CDMs/{username}/PR/{base_name}')
+        cdm = PlayReadyCDM.from_device(device)
+        return jsonify({
+            'security_level': cdm.security_level,
+            'host': f'{config["fqdn"]}/remotecdm/widevine',
+            'secret': f'{api_key}',
+            'device_name': Path(base_name).stem
+        })
 
 @remotecdm_pr_bp.route('/remotecdm/playready/<device>/open', methods=['GET'])
 def remote_cdm_playready_open(device):
@@ -163,6 +183,8 @@ def remote_cdm_playready_parse_license(device):
         })
     session_id = bytes.fromhex(body["session_id"])
     license_message = body["license_message"]
+    if is_base64(license_message):
+        license_message = base64.b64decode(license_message).decode("utf-8")
     try:
         cdm.parse_license(session_id, license_message)
     except InvalidSession:

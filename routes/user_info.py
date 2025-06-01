@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, session
 import os
 import glob
 import logging
-from custom_functions.database.user_db import fetch_api_key, fetch_styled_username
+from custom_functions.database.user_db import fetch_api_key, fetch_styled_username, fetch_username_by_api_key
 
 user_info_bp = Blueprint('user_info_bp', __name__)
 
@@ -10,7 +10,12 @@ user_info_bp = Blueprint('user_info_bp', __name__)
 def user_info():
     username = session.get('username')
     if not username:
-        return jsonify({'message': 'False'}), 400
+        try:
+            headers = request.headers
+            api_key = headers['Api-Key']
+            username = fetch_username_by_api_key(api_key)
+        except:
+            return jsonify({'message': 'False'}), 400
 
     try:
         base_path = os.path.join(os.getcwd(), 'configs', 'CDMs', username.lower())

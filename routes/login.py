@@ -15,7 +15,7 @@ def login():
                 return jsonify({'error': f'Missing required field: {required_field}'}), 400
 
         if verify_user(data['username'], data['password']):
-            session['username'] = data['username']  # Stored securely in a signed cookie
+            session['username'] = data['username'].lower()  # Stored securely in a signed cookie
             return jsonify({'message': 'Successfully logged in!'})
         else:
             return jsonify({'error': 'Invalid username or password!'}), 401

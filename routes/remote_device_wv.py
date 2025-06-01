@@ -13,6 +13,7 @@ from pywidevine.exceptions import (InvalidContext, InvalidInitData, InvalidLicen
 import yaml
 from custom_functions.database.user_db import fetch_api_key, fetch_username_by_api_key
 from custom_functions.user_checks.device_allowed import user_allowed_to_use_device
+from pathlib import Path
 
 remotecdm_wv_bp = Blueprint('remotecdm_wv', __name__)
 with open(f'{os.getcwd()}/configs/config.yaml', 'r') as file:
@@ -35,8 +36,8 @@ def remote_cdm_widevine_deviceinfo():
     if request.method == 'GET':
         base_name = config["default_wv_cdm"]
         if not base_name.endswith(".wvd"):
-            full_file_name = (base_name + ".wvd")
-        device = widevineDevice.load(f'{os.getcwd()}/configs/CDMs/WV/{full_file_name}')
+            base_name = (base_name + ".wvd")
+        device = widevineDevice.load(f'{os.getcwd()}/configs/CDMs/WV/{base_name}')
         cdm = widevineCDM.from_device(device)
         return jsonify({
             'device_type': cdm.device_type.name,
@@ -44,7 +45,24 @@ def remote_cdm_widevine_deviceinfo():
             'security_level': cdm.security_level,
             'host': f'{config["fqdn"]}/remotecdm/widevine',
             'secret': f'{config["remote_cdm_secret"]}',
-            'device_name': f'{base_name}'
+            'device_name': Path(base_name).stem
+        })
+
+@remotecdm_wv_bp.route('/remotecdm/widevine/deviceinfo/<device>', methods=['GET'])
+def remote_cdm_widevine_deviceinfo_specific(device):
+    if request.method == 'GET':
+        base_name = Path(device).with_suffix('.wvd').name
+        api_key = request.headers['X-Secret-Key']
+        username = fetch_username_by_api_key(api_key)
+        device = widevineDevice.load(f'{os.getcwd()}/configs/CDMs/{username}/WV/{base_name}')
+        cdm = widevineCDM.from_device(device)
+        return jsonify({
+            'device_type': cdm.device_type.name,
+            'system_id': cdm.system_id,
+            'security_level': cdm.security_level,
+            'host': f'{config["fqdn"]}/remotecdm/widevine',
+            'secret': f'{api_key}',
+            'device_name': Path(base_name).stem
         })
 
 @remotecdm_wv_bp.route('/remotecdm/widevine/<device>/open', methods=['GET'])

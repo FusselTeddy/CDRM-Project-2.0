@@ -259,3 +259,9 @@ def get_links():
         'telegram': icon_data['telegram'],
         'gitea': icon_data['gitea'],
     })
+
+@api_bp.route('/api/extension', methods=['POST'])
+def verify_extension():
+    return jsonify({
+        'status': True,
+    })
